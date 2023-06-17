@@ -16,6 +16,7 @@ let make_breadcrumb_items = (display: State.display, dispatch) => {
          </li>
          <li className="breadcrumb-item active"> {f.name |> React.string} </li>
        </>
+       | Graph(_) => <div/>
      }}
   </>;
 };

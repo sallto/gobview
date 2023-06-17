@@ -10,6 +10,12 @@ module Message = struct
     | Single p -> loc p
     | Group { pieces; _ } -> pieces |> List.filter_map loc |> List.enum |> Enum.get
 
+  let severity_to_string m = match m.severity with 
+    | Error -> "Error"
+    | Warning -> "Warning"
+    | Info -> "Info"
+    | Debug -> "Debug"
+    | Success -> "Success"
   let severity_to_bs_alert m = match m.severity with
     | Error -> "alert-danger"
     | Warning -> "alert-warning"

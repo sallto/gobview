@@ -26,14 +26,14 @@ let make_nav = (active, dispatch) => {
 };
 
 [@react.component]
-let make = (~active, ~goblint, ~inspect, ~dispatch) => {
+let make = (~active, ~goblint, ~inspect, ~dispatch, ~cil) => {
   <div className="sidebar-right">
     {make_nav(active, dispatch)}
     <div className="tab-content">
       <div className="tab-pane active">
         {switch (active) {
-         | Nodes => <GvNodeStateView goblint inspect />
-         | Globals => <GvGlobalStateView analyses=goblint#global_analyses dispatch/>
+         | Nodes => <GvNodeStateView goblint inspect cil dispatch />
+         | Globals => <GvGlobalStateView analyses=goblint#global_analyses dispatch cil/>
          | _ => <div/>
          }}
       </div>

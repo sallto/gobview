@@ -13,7 +13,12 @@ let make_markers = (warnings, file: GvDisplay.file) =>
   |> List.map(((m, loc: GoblintCil.location)) =>
        Editor.IMarkerData.make(
          ~message=GvMessages.Message.to_string(m),
-         ~severity=MarkerSeverity.Warning,
+         ~severity=switch(m.severity){
+          | Info => MarkerSeverity.Info
+          | Warning => MarkerSeverity.Warning
+          | Error => MarkerSeverity.Error
+          | _ => MarkerSeverity.Warning
+         },
          ~start_line_number=loc.line,
          ~end_line_number=loc.line,
          ~start_column=loc.column,

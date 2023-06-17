@@ -20,6 +20,7 @@ let make = (~state: State.t, ~display: GvDisplay.t, ~dispatch) => {
         dispatch
       />
     | Func(func) => <GvFuncView func dispatch />
+    | Graph(funcdec)=> <GvUsageGraphView search={state.search} funcdec />
     }}
   </div>;
 };

@@ -1,4 +1,6 @@
 open Batteries;
+open GoblintCil;
+open Str;
 
 let make_single = (ctx, path) => {
   <CollapsibleList collapsed=false override_class=[]>
@@ -12,19 +14,30 @@ let make_single = (ctx, path) => {
 };
 
 [@react.component]
-let make = (~goblint, ~inspect) =>
+let make = (~goblint, ~inspect, ~cil, ~dispatch) =>
   switch (inspect) {
   | None => React.null
-  | Some(inspect) =>
+  | Some(inspect) =>{
     <CollapsibleList collapsed=false style=`Flush>
       {goblint#local_analyses(inspect)
        |> List.group(((id, _), (id', _)) => String.compare(id, id'))
        |> List.map(
             fun
             | [(id, (ctx, path))] =>
+            {
+              
               <CollapsibleListItem name={"Node: " ++ id}>
-                {make_single(ctx, path)}
+              {switch(List.find_map_opt((x)=> switch (x){
+               | GFun(fundec,_) when String.length(id) > 3 && string_of_int(fundec.svar.vid) == string_after(id,3) => Some(fundec)
+                | _ => None},cil)){
+              | Some(fundec)=><FindUsageButton dispatch fundec />
+              | None => <div/>
+                }}
+                {make_single(ctx, path)
+                }
+                
               </CollapsibleListItem>
+            }
             | [(id, _), ..._] as group =>
               <CollapsibleListItem name={"Node: " ++ id}>
                 <CollapsibleList style=`Flush>
@@ -41,5 +54,5 @@ let make = (~goblint, ~inspect) =>
             | _ => failwith("List.group returned an empty group"),
           )
        |> React.list}
-    </CollapsibleList>
+    </CollapsibleList>}
   };

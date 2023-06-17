@@ -74,6 +74,7 @@ let make = (~cil, ~goblint, ~warnings, ~meta, ~stats, ~file_loc) => {
           goblint
           inspect={state.inspect}
           dispatch
+          cil={state.cil.globals}
         />
     </div>
   </div>

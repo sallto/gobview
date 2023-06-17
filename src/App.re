@@ -1,4 +1,5 @@
 open Goblint_lib;
+open GoblintCil;
 open Batteries;
 open Js_of_ocaml;
 open Lwt.Infix;
@@ -26,6 +27,7 @@ let renumber_goblint_analyses = registered_name => {
   Hashtbl.clear(MCP.registered);
   Hashtbl.clear(MCP.registered_name);
   Hashtbl.iter((name, id) => {
+    print_string(name);print_newline();
     let old_id = Hashtbl.find(old_registered_name, name);
     let spec = Hashtbl.find(old_registered, old_id);
     Hashtbl.replace(MCP.registered, id, spec);
@@ -74,14 +76,14 @@ let init_goblint = (solver, spec, registered_name, config, cil) => {
   // NOTE: Commenting this out since it breaks the node view. Semantic search
   // may depend on this code but it is currently broken because of unrelated
   // (and uknown) reasons anyway.
-  // Cil.iterGlobals(cil, glob =>
-  //   switch (glob) {
-  //   | GFun(fd, _) =>
-  //     Cil.prepareCFG(fd);
-  //     Cil.computeCFGInfo(fd, true);
-  //   | _ => ()
-  //   }
-  // );
+   Cil.iterGlobals(cil, glob =>
+     switch (glob) {
+     | GFun(fd, _) =>
+       Cil.prepareCFG(fd);
+       Cil.computeCFGInfo(fd, true);
+     | _ => ()
+     }
+   );
   Cilfacade.current_file := cil;
 
   let goblint = GvGoblint.unmarshal(spec, cil);
