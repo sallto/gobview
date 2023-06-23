@@ -3,7 +3,7 @@ open GoblintCil;
 
 let make_func_list = (file, funcs, dispatch) => {
   let on_click = (data, _) => Option.may(dispatch, data);
-
+  <ul>
   {funcs
     |> List.mapi((i, func) => {
         <li key={"inner" ++ string_of_int(i)} className="list-group-item px-5">
@@ -12,7 +12,8 @@ let make_func_list = (file, funcs, dispatch) => {
           </Link>
         </li>
       })
-    |> React.list};
+    |> React.list}
+    </ul>;
 };
 
 [@react.component]
@@ -27,21 +28,16 @@ let make = (~cil: Cil.file, ~dispatch) => {
 
   let on_click = (data, _) => Option.may(dispatch, data);
 
-  <ul className="list-group">
+  <CollapsibleList collapsed={true}>
     {files
      |> Hashtbl.keys
      |> Enum.uniq_by(String.equal)
      |> Enum.mapi((i, file) => {
-          <div key={string_of_int(i)}>
-            <li className="list-group-item">
-              <Link on_click callback_data={`DisplayFile(file)} class_=["text-link"]>
-                {file |> React.string}
-              </Link>
-            </li>
+          <CollapsibleListItem on_click callback_data={`DisplayFile(file)} class_={["text-link"]} key={string_of_int(i)} name={file}>
             {make_func_list(file, Hashtbl.find_all(files, file), dispatch)}
-          </div>
+          </CollapsibleListItem>
         })
      |> List.of_enum
      |> React.list}
-  </ul>;
+  </CollapsibleList>;
 };
