@@ -1,7 +1,8 @@
 open Batteries;
+open GoblintCil;
 
 [@react.component]
-let make = (~cil, ~goblint, ~warnings, ~meta, ~stats, ~file_loc) => {
+let make = (~cil, ~goblint, ~warnings, ~meta, ~stats, ~file_loc, ~graph: Hashtbl.t(fundec,(fundec,Representation.t))) => {
   let (state, dispatch) =
     React.useReducer(
       Reducer.reducer,
@@ -64,7 +65,7 @@ let make = (~cil, ~goblint, ~warnings, ~meta, ~stats, ~file_loc) => {
     <div className="col-6 d-flex flex-column h-100">
       {switch (state.display) {
       | None => <div className="content d-flex flex-column h-75 overflow-auto p-4" />
-      | Some(f) => <Content state display=f dispatch />
+      | Some(f) => <Content state display=f dispatch graph/>
       }}
       <Panel state dispatch />
     </div>

@@ -2,7 +2,7 @@ open Batteries;
 module SelectedSidebar = State.SelectedSidebar;
 open GoblintCil;
 [@react.component]
-let make = (~dispatch, ~fundec: fundec ) => {
+let make = (~dispatch, ~fundec: fundec) => {
         let set_sidebar= 
         ()=> dispatch@@`SwitchSidebarLeft(SelectedSidebar.Search);
         let set_search_mode=
@@ -14,8 +14,7 @@ let make = (~dispatch, ~fundec: fundec ) => {
           dispatch@@`PerformSearch;
           };
           let open_graph= 
-          ()=>{dispatch@@`DisplayUsageGraph(fundec)};
-
+          ()=>{dispatch@@`DisplayUsageGraph(None)};
         <span className="link-like text-muted" onClick={_=>{
           set_sidebar();
           set_search_mode();

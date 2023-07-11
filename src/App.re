@@ -26,21 +26,24 @@ let renumber_goblint_analyses = registered_name => {
   let old_registered_name = Hashtbl.copy(MCP.registered_name);
   Hashtbl.clear(MCP.registered);
   Hashtbl.clear(MCP.registered_name);
-  Hashtbl.iter((name, id) => {
-    print_string(name);print_newline();
-    let old_id = Hashtbl.find(old_registered_name, name);
-    let spec = Hashtbl.find(old_registered, old_id);
-    Hashtbl.replace(MCP.registered, id, spec);
-    Hashtbl.replace(MCP.registered_name, name, id);
-  }, registered_name);
+  Hashtbl.iter(
+    (name, id) => {
+      print_string(name);
+      print_newline();
+      let old_id = Hashtbl.find(old_registered_name, name);
+      let spec = Hashtbl.find(old_registered, old_id);
+      Hashtbl.replace(MCP.registered, id, spec);
+      Hashtbl.replace(MCP.registered_name, name, id);
+    },
+    registered_name,
+  );
 };
 
 let init_goblint = (solver, spec, registered_name, config, cil) => {
   AfterConfig.run(); // This registers the "base" analysis
 
   try(renumber_goblint_analyses(registered_name)) {
-  | Not_found =>
-    raise(InitFailed("Failed to renumber Goblint analyses"))
+  | Not_found => raise(InitFailed("Failed to renumber Goblint analyses"))
   };
 
   Sys.chdir("/"); // Don't remove this
@@ -76,14 +79,14 @@ let init_goblint = (solver, spec, registered_name, config, cil) => {
   // NOTE: Commenting this out since it breaks the node view. Semantic search
   // may depend on this code but it is currently broken because of unrelated
   // (and uknown) reasons anyway.
-   Cil.iterGlobals(cil, glob =>
-     switch (glob) {
-     | GFun(fd, _) =>
-       Cil.prepareCFG(fd);
-       Cil.computeCFGInfo(fd, true);
-     | _ => ()
-     }
-   );
+  Cil.iterGlobals(cil, glob =>
+    switch (glob) {
+    | GFun(fd, _) =>
+      Cil.prepareCFG(fd);
+      Cil.computeCFGInfo(fd, true);
+    | _ => ()
+    }
+  );
   Cilfacade.current_file := cil;
 
   let goblint = GvGoblint.unmarshal(spec, cil);
@@ -91,7 +94,19 @@ let init_goblint = (solver, spec, registered_name, config, cil) => {
   (goblint, cil);
 };
 
-let init = (solver, spec, config, meta, cil, analyses, warnings, stats, file_loc) => {
+let init =
+    (
+      solver,
+      spec,
+      config,
+      meta,
+      cil,
+      analyses,
+      warnings,
+      stats,
+      file_loc,
+      graph,
+    ) => {
   let cil =
     switch (cil) {
     | Ok(s) =>
@@ -136,9 +151,25 @@ let init = (solver, spec, config, meta, cil, analyses, warnings, stats, file_loc
     | _ => raise(InitFailed("Failed to load file path table"))
     };
 
+  let temp_graph =
+    switch (graph) {
+    | Ok(s) => Marshal.from_string(s, 0)
+    | _ => Hashtbl.create(1)
+    };
+    
+  let graph =
+    Hashtbl.map(
+      (_, (f2, yojson)) => {
+        let rep: Representation.t =
+          GvGoblint.representation_of_yojson(yojson);
+         (f2, rep);
+      },
+      temp_graph,
+    );
+
   print_endline("Rendering app...");
   React.Dom.renderToElementWithId(
-    <Main cil goblint warnings meta stats file_loc/>,
+    <Main cil goblint warnings meta stats file_loc graph />,
     "app",
   );
 };
@@ -162,6 +193,7 @@ let handle_error = exc => {
   "./warnings.marshalled",
   "./stats.marshalled",
   "./file_loc.marshalled",
+  "./graph.marshalled",
 ]
 |> List.map(HttpClient.get)
 |> Lwt.all
@@ -169,8 +201,32 @@ let handle_error = exc => {
   l =>
     Lwt.return(
       switch (l) {
-      | [solver, spec, config, meta, cil, analyses, warnings, stats, file_loc] =>
-        try(init(solver, spec, config, meta, cil, analyses, warnings, stats, file_loc)) {
+      | [
+          solver,
+          spec,
+          config,
+          meta,
+          cil,
+          analyses,
+          warnings,
+          stats,
+          file_loc,
+          graph,
+        ] =>
+        try(
+          init(
+            solver,
+            spec,
+            config,
+            meta,
+            cil,
+            analyses,
+            warnings,
+            stats,
+            file_loc,
+            graph,
+          )
+        ) {
         | exc => handle_error(exc)
         }
       | _ => ()
