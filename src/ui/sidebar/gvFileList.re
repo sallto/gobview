@@ -89,26 +89,39 @@ let rec make_tree = (prefix, paths) =>
     Directory(prefix, list);
   };
 let rec compact_tree = t => {
+  let prepend_slash =
+    fun
+    | Directory(p, l) => Directory("/" ++ p, l)
+    | f => f;
   let flattened_tree =
     switch (t) {
-    | Directory(p, [e]) =>
-      switch (e) {
-      | Directory(i, l) =>
-        Directory(p ++ "/" ++ i, l |> List.map(compact_tree))
-      | File(i) => File(p ++ "/" ++ i)
-      }
-    | Directory(p, l) => Directory(p, l |> List.map(compact_tree))
+    | Directory(p, [Directory(i, l)]) =>
+      Directory(p ++ "/" ++ i, l |> List.map(compact_tree))
+    | Directory(p, [File(i)]) => File(p ++ "/" ++ i)
+    | Directory(p, l) =>
+      l
+      |> List.filter_map(
+           fun
+           // Combine root nodes since they are confusing in the UI
+           | Directory("", i_l) => Some(List.map(prepend_slash, i_l))
+           | entry => Some([entry]),
+         )
+      |> List.flatten
+      |> List.map(compact_tree)
+      |> (e => Directory(p, e))
+
     // File entries cannot be flattened
     | file => file
     };
-  // The new directory nodes that resulted from the flatten step might need to be flattened again
+  // The new directory nodes that resulted from the flatten step might need to be flattened again. 
+  // Worst-case: O(log_2(depth)) iterations
+  // comparison is slow, can be replaced with a changed boolean in the main algorithm if necessary
   if (flattened_tree != t) {
     compact_tree(flattened_tree);
   } else {
     flattened_tree;
   };
 };
-
 [@react.component]
 let make = (~cil: Cil.file, ~dispatch) => {
   let files = Hashtbl.create(64);

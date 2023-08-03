@@ -1,3 +1,4 @@
+open Batteries;
 open Js_of_ocaml;
 open GoblintCil;
 let generate_dot_file = (matches, name) => {
@@ -10,19 +11,43 @@ let generate_dot_file = (matches, name) => {
   let result = "graph {" ++ name ++ ";" ++ inner_graph ++ "}";
   result;
 };
-let rec pp = (rep)=>{
-     switch(rep){
-      |`Nothing => print_string("Nothing");print_newline();
-      |`Value(s) => print_string("Value: "++s);print_newline();
-      |`List(l)=>print_string("List");print_newline();List.iter(pp,l);
-      |`Assoc([])=>print_string("EmptyASSOC");print_newline();
-      |`Assoc(l) => List.iter(((str,t))=>{print_string("ASSOC: "++str);print_newline();pp(t);},l);
-      |`Tagged(str,r)=> print_string("Tagged: "++str);print_newline();pp(r);
-      |`Pair(r1,r2)=>print_string("Pair");print_newline();pp(r1);pp(r2);
-    };
+let rec pp = rep => {
+  switch (rep) {
+  | `Nothing =>
+    print_string("Nothing");
+    print_newline();
+  | `Value(s) =>
+    print_string("Value: " ++ s);
+    print_newline();
+  | `List(l) =>
+    print_string("List");
+    print_newline();
+    List.iter(pp, l);
+  | `Assoc([]) =>
+    print_string("EmptyASSOC");
+    print_newline();
+  | `Assoc(l) =>
+    List.iter(
+      ((str, t)) => {
+        print_string("ASSOC: " ++ str);
+        print_newline();
+        pp(t);
+      },
+      l,
+    )
+  | `Tagged(str, r) =>
+    print_string("Tagged: " ++ str);
+    print_newline();
+    pp(r);
+  | `Pair(r1, r2) =>
+    print_string("Pair");
+    print_newline();
+    pp(r1);
+    pp(r2);
+  };
 };
 [@react.component]
-let make = (~graph, ~ctx: option(Representation.t)) => {
+let make = (~graph, ~ctx: option(Representation.t),~dispatch) => {
   /*Hashtbl.iter((_,(_,ctx))=>
     switch(ctx){
       |`Nothing => print_string("Nothing");print_newline();
@@ -33,30 +58,68 @@ let make = (~graph, ~ctx: option(Representation.t)) => {
       |`Tagged(str,_)=> print_string("Tagged: "++str);print_newline();
       |`Pair(_,_)=>print_string("Pair");print_newline();
     },graph);*/
-  let map_to_graph  =(map) => Hashtbl.fold( (x, (y, _), carry) =>
-    carry
-    ++ "\n\""
-    ++ y.svar.vname
-    ++ "\""
-    ++ " -> \""
-    ++ x.svar.vname
-    ++ "\";",map,"digraph{") ++ "}";
+  let show_info = decl_string => {
+    decl_string
+    |> Js.to_string
+    |> String.split(~by=",")
+    |> ((path,name))=> dispatch @@ `DisplayFunc(name,path);
+    
+    // dispatch @@ `DisplayFunc(GoblintCil.golba |> Js.to_string);
+    // When you click on a link like `javascript:show_info('42')` in Firefox, it
+    // replaces the contents of the current page with the return value of
+    // `show_info('42')`. Therefore, this function must explicitly return
+    // `undefined`. DO NOT REMOVE THIS!
+    Js.undefined;
+  };
+
+  /*
+   * Don't remove the underscore at the end of `show_info_`.
+   * Otherwise, the function is mapped as `show`.
+   */
+  Js.(Unsafe.global##.show_info_ := wrap_callback(show_info));
+  let map_to_graph = map =>
+    Hashtbl.fold(
+      (x, (y, _), carry) => {
+       let id = (fn)=>"\""++fn.svar.vdecl.file ++ "," ++ fn.svar.vname++"\"";
+        carry
+        ++ "\n"
+        ++ id(y)
+        ++ "[label=\""
+        ++ y.svar.vname
+        ++ "\"];"
+        ++ id(x)
+        ++ "[label=\""
+        ++ x.svar.vname
+        ++ "\"]"
+        ++ ";"
+        ++ id(y)
+        ++ " -> "
+        ++ id(x)
+        ++ ";"
+      },
+      map,
+      "digraph{\n node [id=\"\\N\",URL=\"javascript:show_info('\\N');\",style=filled,fillcolor=white];\n",
+    )
+    ++ "}";
   let listOfNames =
     switch (ctx) {
     | None =>
       print_string("None\n");
       map_to_graph(graph);
     | Some(c) =>
-          print_string(Yojson.Safe.pretty_to_string(Representation.to_yojson(c)));print_newline();
+      print_string(
+        Yojson.Safe.pretty_to_string(Representation.to_yojson(c)),
+      );
+      print_newline();
       let copy = Hashtbl.copy(graph);
       Hashtbl.filter_map_inplace(
-        (_, (_, f_c) as a) =>{
-          print_string(Yojson.Safe.pretty_to_string(Representation.to_yojson(f_c)));print_newline();
+        (_, (_, f_c) as a) => {
           if (f_c == c) {
             Some(a);
           } else {
             None;
-          }},
+          };
+        },
         copy,
       );
       map_to_graph(copy);

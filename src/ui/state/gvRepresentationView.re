@@ -103,8 +103,137 @@ and make_set = l =>
     |> React.list
   | _ => make_list(l)
   };
+let rec find_node = (represent: Representation.t, name) => {
+  switch (represent) {
+  | `Tagged(n, _) when n == name => Some(represent)
+  | `Tagged(_, child) => find_node(child, name)
+  | `Assoc(list) =>
+    switch (List.find_opt(((n, _)) => n == name, list)) {
+    | Some((n, v)) => Some(`Tagged((n, v)))
+    | None => List.find_map_opt(((_, v)) => find_node(v, name), list)
+    }
+  | `Pair(a, b) =>
+    let first = find_node(a, name);
+    if (first == None) {
+      find_node(b, name);
+    } else {
+      first;
+    };
+  | `List(list) => List.find_map_opt(find_node(_, name), list)
+  | `Value(_) => None
+  | `Nothing => None
+  };
+};
+let cmp_value = (a, b) => {
+  let conditions = [
+    String.contains(_, '['),
+    v => Str.string_match(Str.regexp(".*Not.*"), v, 0),
+    v => Str.string_match(Str.regexp(".*Unknown.*"), v, 0),
+  ];
 
+  let val_to_int = v =>
+    conditions |> List.map(f => v |> f) |> List.map(b => b ? 1 : 0) |> List.sum;
+
+  val_to_int(a) - val_to_int(b);
+};
+let var_eq_to_values = (var_eq: Representation.t) => {
+  let values = Hashtbl.create(10);
+  let equalities_to_entries = l =>
+    switch (l) {
+    | `List(equalities) =>
+      equalities
+      |> List.find_map_opt(
+           fun
+           // find int values
+           | `Value(v) => v |> int_of_string_opt |> Option.map(string_of_int)
+           | _ => None,
+         )
+      |> Option.may(value =>
+           equalities
+           |> List.filter_map(
+                fun
+                | `Value(name) when name != value => Some(name)
+                | _ => None,
+              )
+           |> List.iter(Hashtbl.add(values, _, value))
+         )
+    | _ => ()
+    };
+
+  switch (var_eq) {
+  | `List(l) => l |> List.iter(equalities_to_entries)
+  | _ => ()
+  };
+  values;
+};
+
+let interval_to_entries = (interval: Representation.t) => {
+  let values = Hashtbl.create(10);
+  let expressions_to_entries =
+    fun
+    | (name, vals) => {
+        switch (vals) {
+        | `List(val_list) =>
+          val_list
+          |> List.iter(
+               fun
+               | `Value(value) =>
+                 switch (Hashtbl.find_option(values, name)) {
+                 | Some(old_val) =>
+                   if (cmp_value(old_val, value) > 0) {
+                     Hashtbl.replace(values, name, value);
+                   }
+                 | None => Hashtbl.add(values, name, value)
+                 }
+               | _ => (),
+             )
+        | _ => ()
+        };
+      };
+  switch (interval) {
+  | `Assoc(l) => List.iter(expressions_to_entries, l)
+  | _ => ()
+  };
+  values;
+};
 [@react.component]
 let make = (~represent: Representation.t) => {
-  make_rec(represent);
+  let values = Hashtbl.create(10);
+  let merge = a =>
+    Hashtbl.merge((_, v1, v2) => {v1 == None ? v2 : v1}, values, a);
+  let var_eq = find_node(represent, "var_eq");
+  let values =
+    switch (var_eq) {
+    | Some(`Tagged("var_eq", v)) => merge(var_eq_to_values(v))
+    | _ => values
+    };
+  // TODO: potential different matches
+  let interval = find_node(represent, "value domain");
+  let values =
+    switch (interval) {
+    | Some(`Tagged("value domain", v)) => merge(interval_to_entries(v))
+    | _ => values
+    };
+  <>
+    {<table className="table">
+       <thead>
+         <tr>
+           <th scope="col"> {"Name" |> React.string} </th>
+           <th scope="col"> {"Expression" |> React.string} </th>
+         </tr>
+       </thead>
+       <tbody>
+         {values
+          |> Hashtbl.to_list
+          |> List.map(((k, v)) => {
+               <tr>
+                 <td> {k |> React.string} </td>
+                 <td> {v |> React.string} </td>
+               </tr>
+             })
+          |> React.list}
+       </tbody>
+     </table>}
+    {make_rec(represent)}
+  </>;
 };

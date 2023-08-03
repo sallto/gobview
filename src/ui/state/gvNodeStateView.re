@@ -44,6 +44,7 @@ let make = (~goblint, ~inspect, ~cil, ~dispatch) =>
               | Some(fundec)=><FindUsageButton dispatch fundec />
               | None => <div/>
                 }}
+            
                 {make_single(ctx, path,dispatch)
                 }
                 

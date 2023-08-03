@@ -17,9 +17,11 @@ let make = (~func: GvDisplay.func, ~dispatch) => {
    * Otherwise, the function is mapped as `show`.
    */
   Js.(Unsafe.global##.show_info_ := wrap_callback(show_info));
+  
 
   switch (func.dot) {
   | Some(dot) =>
+    print_string(dot);
     <ErrorBoundary
       message={
         "Cannot display the function graph. The generated DOT file is probably too large."
