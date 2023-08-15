@@ -104,7 +104,6 @@ let make = (~graph, ~ctx: option(Representation.t),~dispatch) => {
   let listOfNames =
     switch (ctx) {
     | None =>
-      print_string("None\n");
       map_to_graph(graph);
     | Some(c) =>
       print_string(

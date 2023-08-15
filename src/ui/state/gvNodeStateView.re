@@ -5,13 +5,13 @@ open Str;
 let make_single = (ctx, path, dispatch) => {
   <CollapsibleList collapsed=false override_class=[]>
     <CollapsibleListItem name="Context" override_class=[]>
-      <button onClick={(_)=>{
+      <button className="btn btn-sm btn-secondary mb-4" onClick={(_)=>{
 dispatch@@`DisplayUsageGraph(Some(ctx));
       }}> {"Find Usages in this Context" |> React.string} </button>
       <GvRepresentationView represent=ctx />
     </CollapsibleListItem>
     <CollapsibleListItem name="Path" override_class=[]>
-      <button onClick={(_)=>{
+      <button className="btn btn-sm btn-secondary mb-4" onClick={(_)=>{
 dispatch@@`DisplayUsageGraph(Some(path));
       }}> {"Find Usages in this Context" |> React.string} </button>
       <GvRepresentationView represent=path />
