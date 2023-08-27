@@ -39,7 +39,7 @@ let rec make_inner = (tree, on_click, files, prefix, dispatch) => {
       prefix ++ "/" ++ current_path;
     };
 
-  <CollapsibleList >
+  <CollapsibleList>
     {if (!List.is_empty(l)) {
        <CollapsibleListItem name=current_path>
          {l
@@ -131,20 +131,34 @@ let make = (~cil: Cil.file, ~dispatch) => {
     | GFun(fdec, loc) => Hashtbl.add(files, loc.file, fdec.svar.vname)
     | _ => (),
   );
+  let (filterText, setFilterText) = React.useState(() => "");
   let tree =
-    make_tree("", files |> Hashtbl.keys |> List.of_enum) |> compact_tree;
+    files
+    |> Hashtbl.keys
+    |> Enum.filter(String.exists(_, filterText))
+    |> List.of_enum
+    |> make_tree("")
+    |> compact_tree;
 
   let on_click = (data, _) => Option.may(dispatch, data);
 
   let list_of_files =
     switch (tree) {
+    | File("") => []
     | Directory(_, l) => l
     | f => [f]
     };
 
+  let on_change = e => {
+    setFilterText(_ => e);
+  };
+
   <>
-    {list_of_files
-     |> List.map(file => make_inner(file, on_click, files, "", dispatch))
-     |> React.list}
+    <Input value=filterText on_change class_={["mb-2"]} />
+    {List.is_empty(list_of_files)
+       ? React.null
+       : list_of_files
+         |> List.map(file => make_inner(file, on_click, files, "", dispatch))
+         |> React.list}
   </>;
 };

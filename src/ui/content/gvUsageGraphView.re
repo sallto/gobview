@@ -130,8 +130,11 @@ let make = (~graph, ~ctx: option(Representation.t), ~dispatch) => {
     switch (ctx) {
     | None => map_to_graph(graph)
     //TODO: path
-    | Some(`Assoc([("MCP.C", c), ..._r])) => build_ctx_graph(c)
-    | Some(c) => build_ctx_graph(c)
+    | Some(`List([`Assoc([("MCP.C", c), ..._r]), ..._rr])) =>
+      build_ctx_graph(c)
+    | Some(c) =>
+      pp(c);
+      build_ctx_graph(c);
     };
   print_string(listOfNames);
   print_newline();

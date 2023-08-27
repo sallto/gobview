@@ -13,14 +13,11 @@ let make = (~dispatch, ~fundec: fundec) => {
           () =>{ dispatch @@`StartPerformSearch;
           dispatch@@`PerformSearch;
           };
-          let open_graph= 
-          ()=>{dispatch@@`DisplayUsageGraph(None)};
         <span className="link-like text-muted" onClick={_=>{
           set_sidebar();
           set_search_mode();
           set_query();
           perform_search();
-          open_graph();
         }}
         >
           {React.string(" Find Usages")}
