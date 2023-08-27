@@ -47,7 +47,7 @@ let rec pp = rep => {
   };
 };
 [@react.component]
-let make = (~graph, ~ctx: option(Representation.t),~dispatch) => {
+let make = (~graph, ~ctx: option(Representation.t), ~dispatch) => {
   /*Hashtbl.iter((_,(_,ctx))=>
     switch(ctx){
       |`Nothing => print_string("Nothing");print_newline();
@@ -62,8 +62,8 @@ let make = (~graph, ~ctx: option(Representation.t),~dispatch) => {
     decl_string
     |> Js.to_string
     |> String.split(~by=",")
-    |> ((path,name))=> dispatch @@ `DisplayFunc(name,path);
-    
+    |> (((path, name)) => dispatch @@ `DisplayFunc((name, path)));
+
     // dispatch @@ `DisplayFunc(GoblintCil.golba |> Js.to_string);
     // When you click on a link like `javascript:show_info('42')` in Firefox, it
     // replaces the contents of the current page with the return value of
@@ -80,48 +80,58 @@ let make = (~graph, ~ctx: option(Representation.t),~dispatch) => {
   let map_to_graph = map =>
     Hashtbl.fold(
       (x, (y, _), carry) => {
-       let id = (fn)=>"\""++fn.svar.vdecl.file ++ "," ++ fn.svar.vname++"\"";
-        carry
-        ++ "\n"
-        ++ id(y)
-        ++ "[label=\""
-        ++ y.svar.vname
-        ++ "\"];"
-        ++ id(x)
-        ++ "[label=\""
-        ++ x.svar.vname
-        ++ "\"]"
-        ++ ";"
-        ++ id(y)
-        ++ " -> "
-        ++ id(x)
-        ++ ";"
+        let id = fn =>
+          "\"" ++ fn.svar.vdecl.file ++ "," ++ fn.svar.vname ++ "\"";
+        let new_entry =
+          id(y)
+          ++ "[label=\""
+          ++ y.svar.vname
+          ++ "\"];"
+          ++ id(x)
+          ++ "[label=\""
+          ++ x.svar.vname
+          ++ "\"]"
+          ++ ";"
+          ++ id(y)
+          ++ " -> "
+          ++ id(x)
+          ++ ";";
+        if (String.exists(carry, new_entry)) {
+          carry;
+        } else {
+          carry ++ "\n" ++ new_entry;
+        };
       },
       map,
       "digraph{\n node [id=\"\\N\",URL=\"javascript:show_info('\\N');\",style=filled,fillcolor=white];\n",
     )
     ++ "}";
+  let build_ctx_graph = c => {
+    print_string(Yojson.Safe.pretty_to_string(Representation.to_yojson(c)));
+    print_newline();
+    let copy = Hashtbl.copy(graph);
+    Hashtbl.filter_map_inplace(
+      (_, (_, f_c) as a) => {
+        print_endline(
+          Yojson.Safe.pretty_to_string(Representation.to_yojson(f_c)),
+        );
+        print_newline();
+        if (f_c == c) {
+          Some(a);
+        } else {
+          None;
+        };
+      },
+      copy,
+    );
+    map_to_graph(copy);
+  };
   let listOfNames =
     switch (ctx) {
-    | None =>
-      map_to_graph(graph);
-    | Some(c) =>
-      print_string(
-        Yojson.Safe.pretty_to_string(Representation.to_yojson(c)),
-      );
-      print_newline();
-      let copy = Hashtbl.copy(graph);
-      Hashtbl.filter_map_inplace(
-        (_, (_, f_c) as a) => {
-          if (f_c == c) {
-            Some(a);
-          } else {
-            None;
-          };
-        },
-        copy,
-      );
-      map_to_graph(copy);
+    | None => map_to_graph(graph)
+    //TODO: path
+    | Some(`Assoc([("MCP.C", c), ..._r])) => build_ctx_graph(c)
+    | Some(c) => build_ctx_graph(c)
     };
   print_string(listOfNames);
   print_newline();

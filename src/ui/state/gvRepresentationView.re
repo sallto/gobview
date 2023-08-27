@@ -124,6 +124,11 @@ let rec find_node = (represent: Representation.t, name) => {
   | `Nothing => None
   };
 };
+type value =
+  | Exact(string, int)
+  | Interval(string, int, int)
+  | Exclusion(string, int, int, list(int));
+
 let cmp_value = (a, b) => {
   let conditions = [
     String.contains(_, '['),
@@ -137,7 +142,6 @@ let cmp_value = (a, b) => {
   val_to_int(a) - val_to_int(b);
 };
 let var_eq_to_values = (var_eq: Representation.t) => {
-  let values = Hashtbl.create(10);
   let equalities_to_entries = l =>
     switch (l) {
     | `List(equalities) =>
@@ -145,75 +149,172 @@ let var_eq_to_values = (var_eq: Representation.t) => {
       |> List.find_map_opt(
            fun
            // find int values
-           | `Value(v) => v |> int_of_string_opt |> Option.map(string_of_int)
+           | `Value(v) => v |> int_of_string_opt
            | _ => None,
          )
-      |> Option.may(value =>
-           equalities
-           |> List.filter_map(
-                fun
-                | `Value(name) when name != value => Some(name)
-                | _ => None,
-              )
-           |> List.iter(Hashtbl.add(values, _, value))
+      |> Option.map_default(
+           value =>
+             equalities
+             |> List.filter_map(
+                  fun
+                  | `Value(name) when name != string_of_int(value) =>
+                    Some(name)
+                  | _ => None,
+                )
+             |> List.map(name => Exact(name, value)),
+           [],
          )
-    | _ => ()
+    | _ => []
     };
 
   switch (var_eq) {
-  | `List(l) => l |> List.iter(equalities_to_entries)
-  | _ => ()
+  | `List(l) => l |> List.map(equalities_to_entries) |> List.concat
+  | _ => []
   };
-  values;
 };
-
 let interval_to_entries = (interval: Representation.t) => {
-  let values = Hashtbl.create(10);
   let expressions_to_entries =
     fun
     | (name, vals) => {
         switch (vals) {
         | `List(val_list) =>
           val_list
-          |> List.iter(
+          |> List.filter_map(
                fun
-               | `Value(value) =>
-                 switch (Hashtbl.find_option(values, name)) {
-                 | Some(old_val) =>
-                   if (cmp_value(old_val, value) > 0) {
-                     Hashtbl.replace(values, name, value);
-                   }
-                 | None => Hashtbl.add(values, name, value)
+               | `Value(v) => {
+                   let interval_regex = Str.regexp("\[\\(.+\\),\\(.+\\)\]");
+                   let exc_regex =
+                     Str.regexp(
+                       "Not {\\(.+\\)}(\[\\([-0-9]+\\),\\([-0-9]+\\)\])",
+                     );
+                   print_string(v);
+                   print_newline();
+                   if (Str.string_match(interval_regex, v, 0)) {
+                     print_endline(Str.matched_group(1, v));
+                     print_endline(Str.matched_group(2, v));
+                     print_newline();
+                     Some(
+                       Interval(
+                         name,
+                         int_of_string(Str.matched_group(1, v)),
+                         int_of_string(Str.matched_group(2, v)),
+                       ),
+                     );
+                   } else if (Str.string_match(exc_regex, v, 0)) {
+                     String.split_on_char(',', Str.matched_group(1, v))
+                     |> List.remove(_, "")
+                     |> List.iter(print_endline);
+                     print_endline(Str.matched_group(2, v));
+                     print_endline(Str.matched_group(3, v));
+                     print_newline();
+                     let exp = l =>
+                       if (l >= 31) {
+                         Int.max_num;
+                       } else if (l <= (-31)) {
+                         Int.min_num;
+                       } else {
+                         l |> abs |> Int.pow(2) |> Int.copysign(l);
+                       };
+
+                     Some(
+                       Exclusion(
+                         name,
+                         int_of_string(Str.matched_group(2, v)) |> exp,
+                         int_of_string(Str.matched_group(3, v)) |> exp,
+                         String.split_on_char(',', Str.matched_group(1, v))
+                         |> List.remove(_, "")
+                         |> List.map(int_of_string),
+                       ),
+                     );
+                   } else {
+                     int_of_string_opt(v) |> Option.map(v => Exact(name, v));
+                   };
                  }
-               | _ => (),
+               | _ => None,
              )
-        | _ => ()
+        | _ => []
         };
       };
-  switch (interval) {
-  | `Assoc(l) => List.iter(expressions_to_entries, l)
-  | _ => ()
-  };
-  values;
+  let ll =
+    switch (interval) {
+    | `Assoc(l) => List.map(expressions_to_entries, l)
+    | _ => []
+    };
+  ll |> List.concat;
 };
+let value_to_pair =
+  fun
+  | Exact(n, v) => (n, string_of_int(v))
+  | Interval(n, l, u) => (
+      n,
+      "[" ++ string_of_int(l) ++ "," ++ string_of_int(u) ++ "]",
+    )
+  // TODO:
+  | Exclusion(n, l, u, exc) => (
+      n,
+      "["
+      ++ string_of_int(l)
+      ++ ","
+      ++ string_of_int(u)
+      ++ "] \\ "
+      ++ "{"
+      ++ (exc |> List.map(string_of_int) |> String.concat(","))
+      ++ "}",
+    );
+
 [@react.component]
 let make = (~represent: Representation.t) => {
-  let values = Hashtbl.create(10);
-  let merge = a =>
-    Hashtbl.merge((_, v1, v2) => {v1 == None ? v2 : v1}, values, a);
   let var_eq = find_node(represent, "var_eq");
   let values =
     switch (var_eq) {
-    | Some(`Tagged("var_eq", v)) => merge(var_eq_to_values(v))
-    | _ => values
+    | Some(`Tagged("var_eq", v)) => var_eq_to_values(v)
+    | _ => []
     };
+
   // TODO: potential different matches
   let interval = find_node(represent, "value domain");
   let values =
     switch (interval) {
-    | Some(`Tagged("value domain", v)) => merge(interval_to_entries(v))
+    | Some(`Tagged("value domain", v)) => values @ interval_to_entries(v)
     | _ => values
     };
+  let cmp = curry(Tuple2.mapn(value_to_pair %> fst) %> uncurry(compare));
+
+  let values =
+    values
+    |> List.group(cmp)
+    |> List.map(l =>
+         List.fold(
+           ((_, lower, upper, exc), value) => {
+             switch (value) {
+             | Exact(n, v) => (n, v, v, [])
+             | Interval(n, l, u) => (
+                 n,
+                 Int.max(l, lower),
+                 Int.min(u, upper),
+                 exc,
+               )
+             | Exclusion(n, l, u, e) => (
+                 n,
+                 Int.max(l, lower),
+                 Int.min(u, upper),
+                 exc @ e |> List.unique,
+               )
+             }
+           },
+           ("", min_int, max_int, []),
+           l,
+         )
+       )
+    |> List.map(((name, lower, upper, exc)) =>
+         if (lower == upper) {
+           Exact(name, lower);
+         } else if (List.is_empty(exc)) {
+           Interval(name, lower, upper);
+         } else {
+           Exclusion(name, lower, upper, exc);
+         }
+       );
   <>
     {<table className="table">
        <thead>
@@ -224,7 +325,7 @@ let make = (~represent: Representation.t) => {
        </thead>
        <tbody>
          {values
-          |> Hashtbl.to_list
+          |> List.map(value_to_pair)
           |> List.map(((k, v)) => {
                <tr>
                  <td> {k |> React.string} </td>
